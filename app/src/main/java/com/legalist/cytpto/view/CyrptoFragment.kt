@@ -1,4 +1,4 @@
-package com.legalist.cytpto
+package com.legalist.cytpto.view
 
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -6,11 +6,15 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.Observer
+import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.legalist.cytpto.adapter.CyrptoRecycleView
 import com.legalist.cytpto.databinding.FragmentCyrptoBinding
 import com.legalist.cytpto.model.CyrptoModelItem
 import com.legalist.cytpto.sevice.CyrptoApi
+import com.legalist.cytpto.viewmodel.CyrptoViewModel
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +31,7 @@ class CyrptoFragment : Fragment(), CyrptoRecycleView.Listener {
     private val Baseurl = "https://raw.githubusercontent.com/"
     private var cyrptoModelItem: ArrayList<CyrptoModelItem>? = null
     private var recycleview: CyrptoRecycleView? = null
+    private lateinit var viewModel: CyrptoViewModel
     private var job: Job? = null
 
     // This property is only valid between onCreateView and
@@ -55,39 +60,62 @@ class CyrptoFragment : Fragment(), CyrptoRecycleView.Listener {
         super.onViewCreated(view, savedInstanceState)
         val layout = LinearLayoutManager(requireContext())
         binding.recyclerView.layoutManager = layout
-        loadData()
+       viewModel = ViewModelProvider(this).get(CyrptoViewModel::class.java)
+        viewModel.fromGetDataApi()
+        observData()
+
     }
 
     override fun onDestroy() {
         super.onDestroy()
         _binding = null
     }
-
-    private fun loadData() {
-        val retrofit = Retrofit.Builder()
-            .baseUrl(Baseurl)
-            .addConverterFactory(GsonConverterFactory.create()).build()
-            .create(CyrptoApi::class.java)
-        job = CoroutineScope(Dispatchers.IO + exceptionHandler).launch {
-            val response = retrofit.getData()
-            withContext(Dispatchers.Main) {
-                if (response.isSuccessful) {
-                    response.body().let { it ->
-                        cyrptoModelItem = it?.let { it1 -> ArrayList(it1) }
-                        cyrptoModelItem?.let {
-                            recycleview = CyrptoRecycleView(it, this@CyrptoFragment)
-                            binding.recyclerView.adapter = recycleview
-                        }
+private fun observData(){
+   viewModel.cyrptoList.observe(viewLifecycleOwner, Observer {
+       binding.recyclerView.visibility = View.VISIBLE
+       recycleview = CyrptoRecycleView(ArrayList(it),this@CyrptoFragment)
+       binding.recyclerView.adapter=recycleview
 
 
-                    }
-
-                }
+   })
+    viewModel.cyrptoError.observe(viewLifecycleOwner, Observer {eror->
+        eror.also {
+            if (it){
+                binding.CyrptoEdittext.visibility = View.VISIBLE
+                binding.recyclerView.visibility =View.GONE
+                binding.CyrptoProgressbar.visibility =View.GONE
             }
+            else{
+                binding.CyrptoEdittext.visibility=View.GONE
+
+
+            }
+
 
         }
 
-    }
+
+    })
+    viewModel.cyrptoLoading.observe(viewLifecycleOwner, Observer {loading->
+        loading.also {
+            if (it){
+               binding.CyrptoProgressbar.visibility = View.VISIBLE
+                binding.recyclerView.visibility =View.GONE
+                binding.CyrptoEdittext.visibility=View.GONE
+            }
+            else{
+                binding.CyrptoProgressbar.visibility = View.GONE
+
+            }
+        }
+
+
+
+    })
+
+
+}
+
 
     override fun onItemClick(cryptoModel: CyrptoModelItem) {
 Toast.makeText(requireContext(),"Clicked on :${cryptoModel.currency}",Toast.LENGTH_LONG).show()
